@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="32" height="32">
+  <style>
+    .i{fill:#0F172A} .a{fill:#06B6D4}
+    @media (prefers-color-scheme: dark){ .i{fill:#F8FAFC} .a{fill:#22D3EE} }
+  </style>
+  <path class="i" d="M48 44 L48 41.78 L44.85 35 L34.93 35 L39.11 44ZM30.45 4 L17.55 4 L0 41.78 L0 44 L8.89 44 L24 11.48 L29.35 23 L39.28 23Z"/>
+  <path class="a" d="M48 32 L48 26 L20.56 26 L17.77 32Z"/>
+</svg>
