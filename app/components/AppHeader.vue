@@ -27,6 +27,11 @@ const items = computed(() => [
         active: route.path === '/learn/nodejs'
       } */
     ]
+  }, {
+    label: 'Playground',
+    icon: 'i-lucide-square-terminal',
+    to: '/playground',
+    active: route.path.startsWith('/playground')
   }
 ])
 watch(() => route.path, () => {
