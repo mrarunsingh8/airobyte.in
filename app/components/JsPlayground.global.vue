@@ -45,7 +45,7 @@ const props = withDefaults(defineProps<{
   lang: undefined,
   full: false,
   heightClass: 'lg:h-[28rem]',
-  timeout: 10000
+  timeout: 5000
 })
 
 const toast = useToast()
@@ -636,9 +636,7 @@ onMounted(() => {
               <p v-if="running && !lines.length" class="flex items-center gap-2 px-4 py-2 text-dimmed">
                 <UIcon name="i-lucide-loader-circle" class="size-3.5 animate-spin" /> Running...
               </p>
-              <p v-else-if="!lines.length" class="px-4 py-2 text-dimmed">
-                No output. Use console.log() to print values.
-              </p>
+              <p v-else-if="!lines.length" class="px-4 py-2 text-dimmed" />
               <div
                 v-for="l in lines"
                 :key="l.id"
