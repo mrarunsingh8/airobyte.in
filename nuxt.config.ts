@@ -14,6 +14,14 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // Own icons: app/assets/icons/<name>.svg → i-custom-<name>
+  icon: {
+    customCollections: [{
+      prefix: 'custom',
+      dir: './app/assets/icons'
+    }]
+  },
+
   content: {
     build: {
       markdown: {

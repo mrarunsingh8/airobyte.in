@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { findPageBreadcrumb, findPageHeadline } from '@nuxt/content/utils'
+import { findPageHeadline } from '@nuxt/content/utils'
 import { withoutTrailingSlash } from 'ufo'
 
 definePageMeta({
@@ -139,8 +139,6 @@ const links = computed(() => {
         v-if="page"
         :value="page"
       />
-
-      <UContentSurround :surround="surround" />
     </UPageBody>
 
     <template

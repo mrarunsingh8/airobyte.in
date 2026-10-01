@@ -74,17 +74,31 @@ const langName: Record<Lang, string> = { js: 'JavaScript', ts: 'TypeScript' }
 // same icons Nuxt UI's ::code-group uses
 const langIcon: Record<Lang, string> = { js: 'i-vscode-icons-file-type-js', ts: 'i-vscode-icons-file-type-typescript' }
 
-const blocks = collect(slots.default?.())
-const tabs: Tab[] = blocks.length
-  ? blocks.map((b, i) => ({ id: `t${i}`, lang: toLang(b.language), label: b.filename || langName[toLang(b.language)], initial: b.code }))
-  : (props.languages.length ? props.languages : ['js' as Lang]).map((l, i) => ({ id: `t${i}`, lang: l, label: langName[l], initial: props.code }))
+// The slot is read lazily, the first time the template renders. Reading it in setup()
+// triggers Vue's "Slot invoked outside of the render function" warning.
+// Markdown code blocks never change after render, so computing this once is enough.
+let tabsCache: Tab[] | null = null
+function getTabs(): Tab[] {
+  if (!tabsCache) {
+    const blocks = collect(slots.default?.())
+    tabsCache = blocks.length
+      ? blocks.map((b, i) => ({ id: `t${i}`, lang: toLang(b.language), label: b.filename || langName[toLang(b.language)], initial: b.code }))
+      : (props.languages.length ? props.languages : ['js' as Lang]).map((l, i) => ({ id: `t${i}`, lang: l, label: langName[l], initial: props.code }))
+  }
+  return tabsCache
+}
+const tabs = computed(getTabs)
 
-const sources = reactive<Record<string, string>>(Object.fromEntries(tabs.map(t => [t.id, t.initial])))
-const firstTab = (tabs.find(t => t.lang === props.lang) ?? tabs[0])!.id
-const active = ref(firstTab)
-const tab = computed(() => tabs.find(t => t.id === active.value)!)
+// Edited code per tab; a tab without an entry still shows its original code
+const sources = reactive<Record<string, string>>({})
+const picked = ref<string>()
+const active = computed({
+  get: () => picked.value ?? (tabs.value.find(t => t.lang === props.lang) ?? tabs.value[0])!.id,
+  set: (id: string) => { picked.value = id }
+})
+const tab = computed(() => tabs.value.find(t => t.id === active.value)!)
 const source = computed({
-  get: () => sources[active.value] ?? '',
+  get: () => sources[active.value] ?? tab.value.initial,
   set: (v: string) => { sources[active.value] = v }
 })
 const lang = computed(() => tab.value.lang)
@@ -199,13 +213,13 @@ undefinedFunction()
   }
 ]
 const exampleItems = computed(() => examples
-  .filter(e => tabs.some(t => t.lang === e.lang) || e.lang === 'js')
+  .filter(e => tabs.value.some(t => t.lang === e.lang) || e.lang === 'js')
   .map(e => ({ label: e.label, value: e.label })))
 const selectedExample = ref<string>()
 watch(selectedExample, (label) => {
   const ex = examples.find(e => e.label === label)
   if (!ex) return
-  const target = tabs.find(t => t.lang === ex.lang) ?? tab.value
+  const target = tabs.value.find(t => t.lang === ex.lang) ?? tab.value
   active.value = target.id
   sources[target.id] = ex.code
   clearConsole()
@@ -218,7 +232,7 @@ const decode = (s: string) => decodeURIComponent(escape(atob(s)))
 
 function load(data: { code?: string, lang?: string }) {
   if (typeof data.code !== 'string') return
-  const target = tabs.find(t => t.lang === data.lang) ?? tabs[0]!
+  const target = tabs.value.find(t => t.lang === data.lang) ?? tabs.value[0]!
   active.value = target.id
   sources[target.id] = data.code
 }
@@ -237,12 +251,12 @@ onMounted(() => {
   } catch { /* storage unavailable */ }
 })
 
-watch([source, active], () => {
+function persist() {
   if (!props.full) return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ code: source.value, lang: lang.value }))
   } catch { /* storage unavailable */ }
-})
+}
 
 async function share() {
   const url = `${window.location.origin}${window.location.pathname}#${encode(JSON.stringify({ code: source.value, lang: lang.value }))}`
@@ -459,12 +473,16 @@ async function highlight() {
     highlighted.value = escapeHtml(code)
   }
 }
-watch([source, active], () => {
-  highlighted.value = highlighted.value || escapeHtml(source.value)
-  if (hlTimer) clearTimeout(hlTimer)
-  hlTimer = setTimeout(highlight, 60)
+// Registered after the first render so they don't read the slot during setup
+onMounted(() => {
+  watch([source, active], persist)
+  watch([source, active], () => {
+    highlighted.value = highlighted.value || escapeHtml(source.value)
+    if (hlTimer) clearTimeout(hlTimer)
+    hlTimer = setTimeout(highlight, 60)
+  })
+  highlight()
 })
-onMounted(highlight)
 
 function onKeydown(e: KeyboardEvent) {
   const el = e.target as HTMLTextAreaElement

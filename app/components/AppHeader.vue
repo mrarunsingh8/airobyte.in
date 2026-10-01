@@ -28,11 +28,16 @@ const items = computed(() => [
       } */
     ]
   }, {
+    label: 'About',
+    icon: 'i-lucide-user-round',
+    to: '/about',
+    active: route.path === '/about'
+  }/* , {
     label: 'Playground',
     icon: 'i-lucide-square-terminal',
     to: '/playground',
     active: route.path.startsWith('/playground')
-  }
+  } */
 ])
 watch(() => route.path, () => {
   showMobileMenu.value = false
