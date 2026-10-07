@@ -27,9 +27,21 @@ const next = computed(() => index.value >= 0 ? lessons.value[index.value + 1] : 
 const completed = computed(() => isCompleted(lessonId.value))
 const favourite = computed(() => isFavourite(lessonId.value))
 
-const lessonPaths = computed(() => new Set(lessons.value.map(lesson => lesson.path)))
+// Pages with `actionBar: false` can't be marked complete, so progress ignores them
+const trackedLessons = computed(() => lessons.value.filter(lesson => (lesson.actionBar !== false)))
+const currentLessonActionBar = computed(() => lessons.value[index.value]?.actionBar)
+const actionBarOptions = computed(() => {
+  const actionBar = currentLessonActionBar.value
+  return actionBar && typeof actionBar === 'object' && !Array.isArray(actionBar)
+    ? actionBar as { favourite?: boolean, completed?: boolean }
+    : undefined
+})
+const isActionBarFavorite = computed(() => currentLessonActionBar.value !== false && actionBarOptions.value?.favourite !== false)
+const isActionBarCompleted = computed(() => currentLessonActionBar.value !== false && actionBarOptions.value?.completed !== false)
+
+const lessonPaths = computed(() => new Set(trackedLessons.value.map(lesson => lesson.path)))
 const doneCount = computed(() => forCourse(props.courseId).filter(entry => entry.completed && lessonPaths.value.has(entry.lessonId)).length)
-const percent = computed(() => lessons.value.length ? Math.round((doneCount.value / lessons.value.length) * 100) : 0)
+const percent = computed(() => trackedLessons.value.length ? Math.round((doneCount.value / trackedLessons.value.length) * 100) : 0)
 
 async function toggleCompleted() {
   const value = !completed.value
@@ -116,6 +128,7 @@ defineShortcuts({
       <!-- Centre: lesson actions -->
       <div class="flex shrink-0 items-center gap-1 sm:gap-2">
         <UButton
+          v-if="isActionBarFavorite"
           :icon="favourite ? 'i-custom-star-filled' : 'i-lucide-star'"
           :color="favourite ? 'warning' : 'neutral'"
           :variant="favourite ? 'soft' : 'ghost'"
@@ -128,6 +141,7 @@ defineShortcuts({
         />
 
         <UButton
+          v-if="isActionBarCompleted"
           :icon="completed ? 'i-lucide-circle-check-big' : 'i-lucide-circle-check'"
           :color="completed ? 'success' : 'primary'"
           :variant="completed ? 'soft' : 'solid'"
@@ -139,7 +153,7 @@ defineShortcuts({
         />
 
         <UBadge
-          :label="`${doneCount}/${lessons.length}`"
+          :label="`${doneCount}/${trackedLessons.length}`"
           color="neutral"
           variant="subtle"
           class="hidden font-mono md:inline-flex"

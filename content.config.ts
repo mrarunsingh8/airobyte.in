@@ -16,7 +16,18 @@ export default defineContentConfig({
           icon: z.string(),
           to: z.string(),
           target: z.string().optional()
-        })).optional()
+        })).optional(),
+        // Set `actionBar: false` in a page's frontmatter to hide the lesson action bar there.
+        // Such pages are also left out of course progress (they can't be marked complete).
+        // actionBar: z.boolean().default(true)
+        actionBar: z.union([
+          z.boolean().default(true),
+          z.object({
+            favourite: z.boolean().default(true),
+            completed: z.boolean().default(true)
+          })
+        ]).default(true)
+
       })
     })
   }

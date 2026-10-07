@@ -14,10 +14,25 @@
  *   ::
  * A filename in the fence (```js [app.js]) becomes the tab label.
  *
+ * Multi-file projects (ES modules): when any block uses `import` / `export`, the blocks become
+ * files in one project, shown as a file tree. Running starts the entry file (app.js, main.js,
+ * index.js, or the last block; override with ::js-playground{entry="start.js"}).
+ * Relative imports work across files and folders (```js [utils/price.js]):
+ *   ::js-playground
+ *   ```js [kitchen.js]
+ *   export const cook = dish => `${dish} is ready`
+ *   ```
+ *   ```js [app.js]
+ *   import { cook } from './kitchen.js'
+ *   console.log(cook('Rajma Chawal'))
+ *   ```
+ *   ::
+ *
  * In Vue: <JsPlayground />  |  <JsPlayground :languages="['js', 'ts']" />  |  <JsPlayground full /> (playground page)
  *
  * Code runs in a Web Worker (off the main thread, can be stopped, no access to the page).
- * Top-level `await` works; `import` statements are not supported.
+ * Top-level `await` works. Single blocks run as classic scripts (as before); blocks that use
+ * import/export run as real ES modules in a module worker.
  * TypeScript is stripped to JS in the browser with Sucrase (loaded on first TS run).
  */
 import type { VNode } from 'vue'
@@ -25,7 +40,7 @@ import type { VNode } from 'vue'
 type Lang = 'js' | 'ts'
 type Level = 'log' | 'info' | 'warn' | 'error' | 'debug' | 'table' | 'system'
 interface Line { id: number, level: Level, text: string }
-interface Tab { id: string, lang: Lang, label: string, initial: string }
+interface Tab { id: string, lang: Lang, label: string, initial: string, path: string }
 
 const props = withDefaults(defineProps<{
   code?: string
@@ -39,13 +54,16 @@ const props = withDefaults(defineProps<{
   heightClass?: string
   /** Stop code that runs longer than this (ms) */
   timeout?: number
+  /** Multi-file projects: file to run (default: app.js, main.js, index.js, else the last block) */
+  entry?: string
 }>(), {
   code: 'console.log(\'Hello, ByteJS!\')\n',
   languages: () => ['js'],
   lang: undefined,
   full: false,
   heightClass: 'lg:h-[28rem]',
-  timeout: 5000
+  timeout: 5000,
+  entry: undefined
 })
 
 const toast = useToast()
@@ -69,6 +87,15 @@ function collect(nodes: unknown, acc: Block[] = []): Block[] {
   }
   return acc
 }
+function normalizePath(path: string): string {
+  const out: string[] = []
+  for (const part of path.replace(/^\/+/, '').split('/')) {
+    if (!part || part === '.') continue
+    if (part === '..') out.pop()
+    else out.push(part)
+  }
+  return out.join('/')
+}
 const toLang = (l?: string): Lang => (l === 'ts' || l === 'typescript' || l === 'tsx') ? 'ts' : 'js'
 const langName: Record<Lang, string> = { js: 'JavaScript', ts: 'TypeScript' }
 // same icons Nuxt UI's ::code-group uses
@@ -82,8 +109,14 @@ function getTabs(): Tab[] {
   if (!tabsCache) {
     const blocks = collect(slots.default?.())
     tabsCache = blocks.length
-      ? blocks.map((b, i) => ({ id: `t${i}`, lang: toLang(b.language), label: b.filename || langName[toLang(b.language)], initial: b.code }))
-      : (props.languages.length ? props.languages : ['js' as Lang]).map((l, i) => ({ id: `t${i}`, lang: l, label: langName[l], initial: props.code }))
+      ? blocks.map((b, i) => ({
+          id: `t${i}`,
+          lang: toLang(b.language),
+          label: b.filename || langName[toLang(b.language)],
+          initial: b.code,
+          path: normalizePath(b.filename || `file${i + 1}.${toLang(b.language)}`)
+        }))
+      : (props.languages.length ? props.languages : ['js' as Lang]).map((l, i) => ({ id: `t${i}`, lang: l, label: langName[l], initial: props.code, path: `main.${l}` }))
   }
   return tabsCache
 }
@@ -93,7 +126,7 @@ const tabs = computed(getTabs)
 const sources = reactive<Record<string, string>>({})
 const picked = ref<string>()
 const active = computed({
-  get: () => picked.value ?? (tabs.value.find(t => t.lang === props.lang) ?? tabs.value[0])!.id,
+  get: () => picked.value ?? (projectMode.value ? entryTab.value : (tabs.value.find(t => t.lang === props.lang) ?? tabs.value[0])!).id,
   set: (id: string) => { picked.value = id }
 })
 const tab = computed(() => tabs.value.find(t => t.id === active.value)!)
@@ -102,6 +135,48 @@ const source = computed({
   set: (v: string) => { sources[active.value] = v }
 })
 const lang = computed(() => tab.value.lang)
+
+/* ---------- multi-file projects (ES modules) ---------- */
+const MODULE_SYNTAX = /^\s*(?:import\s*[\w*{"'\s]|export\s)/m
+const usesModules = (code: string) => MODULE_SYNTAX.test(code) || /\bimport\.meta\b/.test(code)
+/** Blocks become one project (file tree, run the entry file) when any of them uses import/export */
+const projectMode = computed(() => tabs.value.some(t => usesModules(t.initial)))
+const codeOf = (t: Tab) => sources[t.id] ?? t.initial
+
+const ENTRY_NAMES = ['app', 'main', 'index']
+const entryTab = computed<Tab>(() => {
+  const list = tabs.value
+  const wanted = props.entry ? normalizePath(props.entry) : ''
+  return list.find(t => wanted && (t.path === wanted || t.label === props.entry))
+    ?? ENTRY_NAMES.map(n => list.find(t => new RegExp(`(^|/)${n}\\.(m?js|ts)$`).test(t.path))).find(Boolean)
+    ?? list[list.length - 1]!
+})
+
+/** Folder tree for the sidebar, flattened into rows */
+type TreeRow = { kind: 'folder', key: string, label: string, depth: number } | { kind: 'file', key: string, label: string, depth: number, tab: Tab }
+const tree = computed<TreeRow[]>(() => {
+  type Node = { folders: Map<string, Node>, files: Tab[] }
+  const root: Node = { folders: new Map(), files: [] }
+  for (const t of tabs.value) {
+    const parts = t.path.split('/')
+    let node = root
+    for (const dir of parts.slice(0, -1)) {
+      if (!node.folders.has(dir)) node.folders.set(dir, { folders: new Map(), files: [] })
+      node = node.folders.get(dir)!
+    }
+    node.files.push(t)
+  }
+  const rows: TreeRow[] = []
+  const walk = (node: Node, depth: number, prefix: string) => {
+    for (const [name, child] of [...node.folders].sort(([a], [b]) => a.localeCompare(b))) {
+      rows.push({ kind: 'folder', key: `${prefix}${name}/`, label: name, depth })
+      walk(child, depth + 1, `${prefix}${name}/`)
+    }
+    for (const t of node.files) rows.push({ kind: 'file', key: t.id, label: t.path.split('/').pop()!, depth, tab: t })
+  }
+  walk(root, 0, '')
+  return rows
+})
 
 const lines = ref<Line[]>([])
 const running = ref(false)
@@ -125,6 +200,8 @@ const statusDot = {
 const statusText = { idle: 'Not run yet', running: 'Running', success: 'Ran successfully', error: 'Failed' } as const
 let worker: Worker | null = null
 let workerUrl: string | null = null
+/** blob: URLs of the files in a multi-file run, and their file names (to clean up error messages) */
+let moduleUrls: Record<string, string> = {}
 let timer: ReturnType<typeof setTimeout> | null = null
 let startedAt = 0
 
@@ -359,6 +436,8 @@ function stopWorker() {
   worker = null
   if (workerUrl) URL.revokeObjectURL(workerUrl)
   workerUrl = null
+  for (const url of Object.keys(moduleUrls)) URL.revokeObjectURL(url)
+  moduleUrls = {}
   if (timer) clearTimeout(timer)
   timer = null
 }
@@ -380,36 +459,45 @@ async function run() {
   running.value = true
   startedAt = performance.now()
 
-  let js: string
-  try {
-    js = await toJs(source.value, lang.value)
-    if (!stale.value) lines.value = lines.value.filter(l => l.level !== 'system')
-  } catch (err) {
-    push('error', `Compile error: ${(err as Error).message}`)
-    duration.value = Math.round(performance.now() - startedAt)
-    running.value = false
-    return
-  }
+  // Several files, or a file that uses import/export → run as ES modules
+  const files = projectMode.value ? tabs.value : (usesModules(source.value) ? [tab.value] : null)
 
-  // Classic worker (module workers from blob: URLs are blocked in some browsers/origins).
-  // The async wrapper keeps top-level `await` working.
-  const script = `${prelude}
+  let script: string
+  try {
+    if (files) {
+      script = await buildModules(files)
+    } else {
+      const js = await toJs(source.value, lang.value)
+      // Classic worker (module workers from blob: URLs are blocked in some browsers/origins).
+      // The async wrapper keeps top-level `await` working.
+      script = `${prelude}
 (async () => {
 ${js}
 })().then(
   () => { __pg_mainDone = true; __pg_check(); },
   (e) => { __pg_uncaught(e); self.postMessage({ __done: true }); }
 );`
+    }
+    if (!stale.value) lines.value = lines.value.filter(l => l.level !== 'system')
+  } catch (err) {
+    push('error', `${files ? '' : 'Compile error: '}${(err as Error).message}`)
+    for (const url of Object.keys(moduleUrls)) URL.revokeObjectURL(url)
+    moduleUrls = {}
+    duration.value = Math.round(performance.now() - startedAt)
+    running.value = false
+    return
+  }
+
   workerUrl = URL.createObjectURL(new Blob([script], { type: 'text/javascript' }))
-  worker = new Worker(workerUrl)
+  worker = new Worker(workerUrl, files ? { type: 'module' } : undefined)
 
   worker.onmessage = (e: MessageEvent) => {
     if (e.data?.__done) return finish()
-    push(e.data.level, e.data.text)
+    push(e.data.level, files ? cleanUrls(e.data.text) : e.data.text)
   }
   worker.onerror = (e: Event) => {
     e.preventDefault()
-    push('error', (e as ErrorEvent).message || 'The code could not be run (syntax error or blocked script).')
+    push('error', cleanUrls((e as ErrorEvent).message || 'The code could not be run (syntax error or blocked script).'))
     finish()
   }
   timer = setTimeout(() => {
@@ -421,6 +509,76 @@ ${js}
       push('system', `Stopped: code ran longer than ${props.timeout / 1000}s (infinite loop?)`)
     }
   }, props.timeout)
+}
+
+/* ---------- ES module runner ----------
+ * Each file becomes a blob: URL. Relative imports ("./kitchen.js", "../utils/price.js") are
+ * rewritten to the blob URL of the matching file, dependencies first. import() with a computed
+ * path goes through a small resolver inside the worker. The entry file is loaded by a wrapper
+ * module that installs the console/timer prelude first.
+ */
+const isRelative = (spec: string) => spec.startsWith('./') || spec.startsWith('../') || spec.startsWith('/')
+const resolveFrom = (from: string, spec: string) =>
+  normalizePath(spec.startsWith('/') ? spec : (from.includes('/') ? from.slice(0, from.lastIndexOf('/') + 1) : '') + spec)
+
+/** Finds a file by path, allowing "./x" for x.js and "./x.js" for x.ts */
+function findPath(files: Record<string, string>, path: string): string | null {
+  const bare = path.replace(/\.(m?js|ts)$/, '')
+  for (const p of [path, `${bare}.js`, `${bare}.ts`, `${bare}.mjs`, `${path}/index.js`, `${path}/index.ts`]) {
+    if (p in files) return p
+  }
+  return null
+}
+
+function cleanUrls(text: string): string {
+  let out = text
+  for (const [url, path] of Object.entries(moduleUrls)) out = out.split(url).join(path)
+  return out
+}
+
+async function buildModules(files: Tab[]): Promise<string> {
+  const code: Record<string, string> = {}
+  for (const t of files) code[t.path] = await toJs(codeOf(t), t.lang)
+
+  const urlOf: Record<string, string> = {}
+  const building = new Set<string>()
+  const build = (path: string, importer?: string): string => {
+    const found = findPath(code, path)
+    if (!found) throw new Error(`Cannot find module "./${path}"${importer ? ` imported from ${importer}` : ''}`)
+    if (urlOf[found]) return urlOf[found]
+    if (building.has(found)) throw new Error(`Circular import at "${found}": the playground does not support circular imports.`)
+    building.add(found)
+    const rewritten = code[found]!
+      // from "./x.js" · import "./x.js" · import("./x.js")
+      .replace(/(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'])([^"'\n]+)\2/g, (match, before: string, quote: string, spec: string) =>
+        isRelative(spec) ? `${before}${quote}${build(resolveFrom(found, spec), found)}${quote}` : match)
+      // import() with a computed path, e.g. import(`./lang/${code}.js`)
+      .replace(/(^|[^.\w$])import\s*\((?!\s*["']blob:)/g, '$1__pg_import(')
+    // kept on line 1 so error line numbers still match the file
+    const shim = `const __pg_import = (s) => self.__pg_dynamicImport(s, ${JSON.stringify(found)});`
+    const url = URL.createObjectURL(new Blob([shim + rewritten], { type: 'text/javascript' }))
+    moduleUrls[url] = found
+    urlOf[found] = url
+    building.delete(found)
+    return url
+  }
+
+  const entry = build(entryTab.value.path)
+  for (const path of Object.keys(code)) build(path) // so import(`./${x}.js`) can reach every file
+
+  return `${prelude}
+const __pg_urls = ${JSON.stringify(urlOf)};
+const __pg_norm = ${normalizePath.toString()};
+const __pg_find = (p) => { const b = p.replace(/\\.(m?js|ts)$/, ''); return [p, b + '.js', b + '.ts', b + '.mjs', p + '/index.js', p + '/index.ts'].find(x => x in __pg_urls); };
+self.__pg_dynamicImport = (spec, from) => {
+  if (!/^\\.{0,2}\\//.test(spec)) return import(spec);
+  const path = __pg_find(__pg_norm(spec.startsWith('/') ? spec : (from.includes('/') ? from.slice(0, from.lastIndexOf('/') + 1) : '') + spec));
+  return path ? import(__pg_urls[path]) : Promise.reject(new Error('Cannot find module "' + spec + '" imported from ' + from));
+};
+import(${JSON.stringify(entry)}).then(
+  () => { __pg_mainDone = true; __pg_check(); },
+  (e) => { __pg_uncaught(e); self.postMessage({ __done: true }); }
+);`
 }
 
 function stop() {
@@ -440,7 +598,8 @@ function clearConsole() {
 }
 
 function reset() {
-  sources[active.value] = tab.value.initial
+  if (projectMode.value) for (const t of tabs.value) sources[t.id] = t.initial
+  else sources[active.value] = tab.value.initial
   selectedExample.value = undefined
   clearConsole()
   if (!props.full) showOutput.value = false
@@ -450,7 +609,9 @@ onBeforeUnmount(stopWorker)
 
 /* ---------- editor (Shiki-highlighted, same themes as content code blocks) ---------- */
 const lineCount = computed(() => source.value.split('\n').length)
-const changed = computed(() => source.value !== tab.value.initial)
+const changed = computed(() => projectMode.value
+  ? tabs.value.some(t => codeOf(t) !== t.initial)
+  : source.value !== tab.value.initial)
 
 const escapeHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const highlighted = ref('')
@@ -532,8 +693,21 @@ onMounted(() => {
   <div class="not-prose group/pg my-5">
     <!-- tab bar: same look as ::code-group -->
     <div class="relative flex items-center gap-1 overflow-x-auto rounded-t-md border border-b-0 border-muted bg-default p-2">
+      <!-- multi-file project: show the open file and which file runs -->
+      <div v-if="projectMode" class="flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-sm">
+        <UIcon name="i-lucide-folder-tree" class="size-4 shrink-0 text-muted" />
+        <span class="truncate font-mono text-highlighted">{{ tab.path }}</span>
+        <UBadge
+          v-if="tab.id === entryTab.id"
+          label="runs first"
+          color="primary"
+          variant="subtle"
+          size="sm"
+          class="shrink-0"
+        />
+      </div>
       <button
-        v-for="t in tabs"
+        v-for="t in (projectMode ? [] : tabs)"
         :key="t.id"
         type="button"
         class="relative inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-sm outline-primary/25 transition-colors focus-visible:outline-3"
@@ -591,25 +765,68 @@ onMounted(() => {
       class="overflow-hidden rounded-b-md border border-muted outline-primary/25 focus-within:outline-3"
       :class="full && 'lg:grid lg:grid-cols-2'"
     >
-      <!-- editor: prose `pre` classes; highlighted code under a transparent textarea -->
       <div
-        class="grid bg-muted font-mono text-sm/6 *:col-start-1 *:row-start-1"
-        :class="full ? ['h-80 overflow-auto lg:border-r lg:border-muted', heightClass] : ''"
+        :class="[
+          projectMode && 'sm:grid sm:grid-cols-[minmax(9rem,13rem)_minmax(0,1fr)]',
+          full && projectMode && 'lg:border-r lg:border-muted'
+        ]"
       >
-        <pre
-          aria-hidden="true"
-          class="pointer-events-none px-4 py-3 break-words whitespace-pre-wrap [&_span]:text-(--shiki-light) dark:[&_span]:text-(--shiki-dark)"
-        ><code v-html="highlighted + '\n'" /></pre>
-        <textarea
-          v-model="source"
-          spellcheck="false"
-          autocapitalize="off"
-          autocomplete="off"
-          :aria-label="`${tab.label} code editor`"
-          :rows="lineCount"
-          class="h-full w-full resize-none overflow-hidden bg-transparent px-4 py-3 break-words whitespace-pre-wrap text-transparent caret-(--ui-text-highlighted) outline-none selection:bg-primary/25"
-          @keydown="onKeydown"
-        />
+        <!-- file tree (multi-file projects) -->
+        <nav
+          v-if="projectMode"
+          aria-label="Files"
+          class="flex gap-0.5 overflow-x-auto border-b border-muted bg-default p-1.5 font-mono text-[13px] sm:flex-col sm:overflow-x-visible sm:border-r sm:border-b-0"
+        >
+          <template v-for="row in tree" :key="row.key">
+            <div
+              v-if="row.kind === 'folder'"
+              class="hidden items-center gap-1.5 py-1 pr-2 text-muted sm:flex"
+              :style="{ paddingLeft: `${0.5 + row.depth * 0.875}rem` }"
+            >
+              <UIcon name="i-lucide-folder-open" class="size-4 shrink-0" />
+              <span class="truncate">{{ row.label }}</span>
+            </div>
+            <button
+              v-else
+              type="button"
+              class="flex shrink-0 items-center gap-1.5 rounded-md py-1 pr-2 text-left outline-primary/25 transition-colors focus-visible:outline-3 max-sm:pl-2!"
+              :class="active === row.tab.id ? 'bg-elevated text-highlighted shadow-xs' : 'text-default hover:bg-elevated/50'"
+              :style="{ paddingLeft: `${0.5 + row.depth * 0.875}rem` }"
+              :title="row.tab.path"
+              @click="active = row.tab.id"
+            >
+              <UIcon :name="langIcon[row.tab.lang]" class="size-4 shrink-0" />
+              <span class="truncate"><span class="text-muted sm:hidden">{{ row.tab.path.slice(0, -row.label.length) }}</span>{{ row.label }}</span>
+              <UIcon
+                v-if="row.tab.id === entryTab.id"
+                name="i-lucide-play"
+                class="ml-auto size-3 shrink-0 text-primary"
+                aria-label="runs first"
+              />
+            </button>
+          </template>
+        </nav>
+
+        <!-- editor: prose `pre` classes; highlighted code under a transparent textarea -->
+        <div
+          class="grid min-w-0 bg-muted font-mono text-sm/6 *:col-start-1 *:row-start-1"
+          :class="full ? ['h-80 overflow-auto', !projectMode && 'lg:border-r lg:border-muted', heightClass] : ''"
+        >
+          <pre
+            aria-hidden="true"
+            class="pointer-events-none px-4 py-3 break-words whitespace-pre-wrap [&_span]:text-(--shiki-light) dark:[&_span]:text-(--shiki-dark)"
+          ><code v-html="highlighted + '\n'" /></pre>
+          <textarea
+            v-model="source"
+            spellcheck="false"
+            autocapitalize="off"
+            autocomplete="off"
+            :aria-label="`${tab.label} code editor`"
+            :rows="lineCount"
+            class="h-full w-full resize-none overflow-hidden bg-transparent px-4 py-3 break-words whitespace-pre-wrap text-transparent caret-(--ui-text-highlighted) outline-none selection:bg-primary/25"
+            @keydown="onKeydown"
+          />
+        </div>
       </div>
 
       <!-- output: slides open/closed by animating grid rows 0fr ↔ 1fr -->

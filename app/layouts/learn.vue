@@ -12,7 +12,8 @@ function tally(items: ContentNavigationItem[] = []): { done: number, total: numb
       const sub = tally(item.children)
       return { done: acc.done + sub.done, total: acc.total + sub.total }
     }
-    if (item.page === false) return acc
+    // Pages without the action bar can't be marked complete, so they don't count
+    if (item.page === false || item.actionBar === false) return acc
     return { done: acc.done + (isCompleted(item.path) ? 1 : 0), total: acc.total + 1 }
   }, { done: 0, total: 0 })
 }
@@ -69,6 +70,16 @@ function contains(item: ContentNavigationItem, path: string): boolean {
   return item.path === path || !!item.children?.some(child => contains(child, path))
 }
 const currentPath = computed(() => route.path.replace(/\/$/, ''))
+
+/** Current lesson in the sidebar tree; `actionBar: false` in its frontmatter hides the action bar */
+function findItem(items: ContentNavigationItem[], path: string): ContentNavigationItem | undefined {
+  for (const item of items) {
+    if (item.path === path) return item
+    const hit = findItem(item.children ?? [], path)
+    if (hit) return hit
+  }
+}
+const showActionBar = computed(() => findItem(navigation.value, currentPath.value)?.actionBar !== false)
 const openModule = computed(() => navigation.value.find(item => contains(item, currentPath.value))?.path ?? '')
 
 // Whole-course progress for the sidebar header
@@ -126,7 +137,11 @@ const coursePercent = computed(() => courseTally.value.total ? Math.round((cours
         <slot />
       </UPage>
     </UContainer>
-    <LessonActionBar :navigation="progressNavigation" :course-id="slug" />
+    <LessonActionBar
+      v-if="showActionBar"
+      :navigation="progressNavigation"
+      :course-id="slug"
+    />
     <AppFooter />
   </div>
 </template>

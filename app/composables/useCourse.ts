@@ -34,7 +34,7 @@ export function useCourse() {
 
   const ready = useAsyncData(
     () => `course-nav:${slug.value}`,
-    () => queryCollectionNavigation('learn', ['description']).orWhere(inCourse(basePath.value))
+    () => queryCollectionNavigation('learn', ['description', 'actionBar']).orWhere(inCourse(basePath.value))
   )
 
   const courseNode = computed(() => findNode(ready.data.value ?? [], basePath.value))
