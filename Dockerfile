@@ -1,5 +1,5 @@
 # ---- deps & build ----
-FROM node:26-alpine AS builder
+FROM node:26 AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -9,7 +9,7 @@ COPY . .
 RUN npm run build
 
 # ---- runtime ----
-FROM node:26-alpine AS runner
+FROM node:26 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NUXT_HOST=0.0.0.0
