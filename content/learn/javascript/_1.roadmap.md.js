@@ -314,9 +314,8 @@ Lesson name: {{LESSON_NAME}}
   - `::caution` for dangerous/buggy behaviour
   Each closes with `::` on its own line.
 - Use tables for comparisons (e.g., `var` vs `let` vs `const`).
-- Use emojis sparingly as visual markers (🍳 ✅ ❌ 💡 ⚠️), not in every line.
 
-## Code playground components (use for ALL runnable code)
+## Use custom Code playground components (use for ALL runnable code)
 
 **Simple view** – for single-file examples:
 
@@ -355,7 +354,7 @@ console.log(cook("Rajma Chawal"));   // 🍳 Rajma Chawal is ready
 ### Playground rules
 - Every playground must run without errors (unless it is intentionally showing an error — then say so clearly and use `try...catch` so the playground still runs).
 - Show expected output as an inline comment: `// → value`.
-- Keep each example short (ideally 5–20 lines) and focused on one idea.
+- Keep each example short (ideally 10–30 lines) and focused on one idea.
 - In tree view, every imported file must exist and every `import` path must be correct and match the file labels exactly.
 - Use ES module syntax (`import`/`export`) only, never `require`.
 - Non-runnable snippets (like wrong-vs-right comparisons or pseudo code) may use a normal ```js block.
