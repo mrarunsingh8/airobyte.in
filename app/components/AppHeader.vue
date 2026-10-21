@@ -18,14 +18,14 @@ const items = computed(() => [
         to: '/learn/javascript',
         icon: 'i-simple-icons-javascript',
         active: route.path === '/learn/javascript'
-      } /* ,
+      },
       {
         label: 'Node JS',
         description: 'Learn the fundamentals of Node.js, the JavaScript runtime built on Chrome\'s V8 JavaScript engine.',
         to: '/learn/nodejs',
         icon: 'i-simple-icons-nodedotjs',
         active: route.path === '/learn/nodejs'
-      } */
+      }
     ]
   }, {
     label: 'About',
