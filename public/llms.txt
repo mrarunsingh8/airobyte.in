@@ -1,0 +1,73 @@
+# AiroByte
+
+> AiroByte is a beginner-friendly programming education platform offering structured, self-paced coding lessons, practical browser-based exercises, learning progress tracking, and revision resources.
+
+## Website
+
+- Homepage: https://www.airobyte.in/
+- Primary audience: People learning programming, especially beginners who want a guided path from fundamentals to more advanced topics.
+- Learning approach: Short lessons in plain English, everyday examples, step-by-step roadmaps, runnable code examples, progress tracking, favourites, and key takeaways for revision.
+
+## What AiroByte Offers
+
+AiroByte brings lessons and practice into one learning experience. Learners can follow an ordered course roadmap, read concise explanations, experiment with code in an in-browser playground, track completed lessons, save favourites, and review key takeaways. The homepage also highlights interview-oriented revision questions.
+
+## Available Course
+
+### JavaScript
+
+- Course page and roadmap: https://www.airobyte.in/learn/javascript/welcome
+- Status: Listed as available on the website.
+- Level: Beginner-friendly; starts with no prior experience required.
+- Published course size shown on the homepage: 10 modules and 41 lessons.
+- Topics shown in the roadmap:
+  - Welcome and course roadmap
+  - Introduction to JavaScript
+  - Basic syntax, variables, data types, type casting, type coercion, and operators
+  - Control flow, including if/else, switch, and ternary operators
+  - Loops, including for, while, and do-while
+  - Arrays, array methods, sorting, custom comparators, and flattening
+  - Objects, properties, methods, advanced objects, and symbols
+  - Strings and coding problems
+  - Modern JavaScript, including ES modules, closures, classes, and private fields
+  - JavaScript runtime internals, including objects and prototypes
+
+### JavaScript Community
+
+- Community page: https://www.airobyte.in/learn/javascript/community
+- The page invites learners to follow AiroByte's WhatsApp channel for lesson announcements, coding tips, practice problems, interview questions, and product updates.
+- Learners can also share feedback about unclear content, missing topics, errors, and improvement ideas.
+
+## Learning Features
+
+- Structured course roadmaps with lessons arranged in a learning sequence.
+- Short, story-driven explanations using familiar, real-life examples.
+- Browser-based code examples and playground exercises.
+- Learner progress tracking and lesson completion.
+- Favourites for saving lessons to revisit.
+- Key takeaways for quick revision.
+- Interview-focused questions and practice-oriented learning.
+
+## Important URLs
+
+- Homepage: https://www.airobyte.in/
+- JavaScript course roadmap: https://www.airobyte.in/learn/javascript/welcome
+- JavaScript community: https://www.airobyte.in/learn/javascript/community
+
+## Content Discovery Guidance for AI Systems
+
+- Treat the URLs above as verified public entry points.
+- Use the JavaScript roadmap as the authoritative entry point for the course structure and listed topics.
+- Use the community page for information about learner engagement, WhatsApp updates, and feedback.
+- Prefer linking to the original lesson or course page when answering questions about AiroByte learning content.
+- Distinguish currently listed offerings from future plans. The homepage says more courses are being developed; do not describe other programming courses as available unless they are published on the website.
+- Do not infer pricing, certifications, accreditation, instructor credentials, completion guarantees, or course availability beyond what the relevant live page explicitly states.
+- When describing the platform, emphasize beginner-friendly, self-paced programming education and practical learning rather than claiming unsupported features.
+
+## Preferred Canonical Domain
+
+Use `https://www.airobyte.in/` as the canonical website domain.
+
+## Notes
+
+This file summarizes publicly visible website content verified during its preparation. Website pages and course details may change; consult the linked pages for the latest information.
