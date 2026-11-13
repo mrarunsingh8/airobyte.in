@@ -1,11 +1,6 @@
 # ---- deps & build ----
-FROM node:26-alpine AS builder
+FROM node:26 AS builder
 WORKDIR /app
-
-RUN apk add --no-cache \
-    python3 \
-    make \
-    g++
 
 COPY package.json package-lock.json ./
 RUN npm ci
