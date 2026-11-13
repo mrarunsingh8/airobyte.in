@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { findPageHeadline } from '@nuxt/content/utils'
 import { withoutTrailingSlash } from 'ufo'
 
 definePageMeta({
@@ -10,7 +9,7 @@ const route = useRoute()
 const { toc } = useAppConfig()
 const path = computed(() => withoutTrailingSlash(route.path))
 const segments = computed(() => [route.params.slug ?? []].flat().filter(Boolean))
-const { basePath, contentNavigation, title: courseTitle, ready } = useCourse()
+const { basePath, ready } = useCourse()
 
 // Public URLs are /learn/<course>/<lesson>; content paths keep section folders
 // (/learn/<course>/<section>/<lesson>), so a flat URL is resolved by its last segment.
@@ -52,7 +51,7 @@ if (!page.value) {
     : null
 
   if (first) {
-    await navigateTo(toPublicPath(first.path), { redirectCode: 302 })
+    await navigateTo(toPublicPath(first.path), { redirectCode: 301 })
   } else {
     throw createError({ statusCode: 404, statusMessage: 'Page not found', fatal: true })
   }
@@ -71,19 +70,14 @@ const { data: rawSurround } = await useAsyncData(
 )
 const surround = computed(() => rawSurround.value?.map(item => item && { ...item, path: toPublicPath(item.path) }))
 
-const title = page.value?.seo?.title || page.value?.title
-const description = page.value?.seo?.description || page.value?.description
+const title = computed(() => page.value?.seo?.title || page.value?.title || 'JavaScript Lesson')
+const description = computed(() => page.value?.seo?.description || page.value?.description || `Learn ${title.value} in this beginner-friendly JavaScript lesson with clear explanations and practical examples.`)
 
-useSeoMeta({
-  title,
-  ogTitle: title,
+usePageSeo(path, {
+  title: computed(() => `${title.value} | JavaScript Lesson`),
   description,
-  ogDescription: description
+  type: 'article'
 })
-
-const headline = computed(() => findPageHeadline(contentNavigation.value, page.value?.path))
-
-defineOgImage('Docs', { title, description, headline: headline.value })
 
 /* const breadcrumb = computed(() => {
   const items = [

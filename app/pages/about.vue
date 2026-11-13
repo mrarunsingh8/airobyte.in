@@ -118,9 +118,9 @@ const helps = [{
   slot: 'developer' as const
 }]
 
-useSeoMeta({
-  title: 'About',
-  description: 'Meet Arun Kumar and find out why he built AiroByte: one place to learn programming from zero and brush up on every topic before an interview.'
+usePageSeo('/about', {
+  title: 'About AiroByte and Its Learning Mission',
+  description: 'Meet Arun Kumar and learn why AiroByte makes programming lessons easier to follow, revisit, and use for interview preparation.'
 })
 </script>
 

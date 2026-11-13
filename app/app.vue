@@ -1,6 +1,4 @@
 <script setup lang="ts">
-const { seo } = useAppConfig()
-
 // Site-wide search across all courses (results are grouped by course).
 // The sidebar navigation is per course: see useCourse() in layouts/docs.vue.
 // Paths are converted to public URLs (/learn/<course>/<lesson>), see utils/coursePath.ts.
@@ -15,10 +13,13 @@ const { data: files } = useLazyAsyncData('search', () => queryCollectionSearchSe
 
 useHead({
   meta: [
-    { name: 'viewport', content: 'width=device-width, initial-scale=1' }
+    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+    { name: 'theme-color', content: '#00b8db' }
   ],
   link: [
-    { rel: 'icon', href: '/favicon.ico' }
+    { rel: 'icon', href: '/favicon.ico' },
+    { rel: 'icon', type: 'image/svg+xml', href: '/logos/favicon.svg' },
+    { rel: 'apple-touch-icon', href: '/logos/apple-touch-icon.png' }
   ],
   htmlAttrs: {
     lang: 'en'
@@ -26,8 +27,9 @@ useHead({
 })
 
 useSeoMeta({
-  titleTemplate: `%s - ${seo?.siteName}`,
-  ogSiteName: seo?.siteName,
+  titleTemplate: '%s | AiroByte',
+  ogSiteName: 'AiroByte',
+  ogLocale: 'en_IN',
   twitterCard: 'summary_large_image'
 })
 </script>

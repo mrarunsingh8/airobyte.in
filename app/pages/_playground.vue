@@ -1,7 +1,8 @@
 <script setup lang="ts">
-useSeoMeta({
-  title: 'JS / TS Playground',
-  description: 'Write and run JavaScript right in your browser.'
+usePageSeo('/playground', {
+  title: 'JavaScript and TypeScript Playground',
+  description: 'Write and run JavaScript in your browser with the AiroByte playground.',
+  robots: 'noindex, nofollow'
 })
 </script>
 

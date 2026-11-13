@@ -10,9 +10,9 @@ const courses = computed(() => findPageChildren(data.value ?? [], '/learn').map(
   icon: course.icon as string | undefined
 })))
 
-useSeoMeta({
-  title: 'Courses',
-  description: 'All courses available on the platform.'
+usePageSeo('/learn', {
+  title: 'Programming Courses for Beginners',
+  description: 'Browse AiroByte programming courses and start learning with structured, beginner-friendly lessons and practical browser-based examples.'
 })
 </script>
 
