@@ -36,7 +36,10 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
-    '/': { prerender: true }
+    '/': { prerender: true },
+    '/robots.txt': { prerender: true },
+    '/sitemap.xml': { prerender: true },
+    '/playground': { headers: { 'X-Robots-Tag': 'noindex, nofollow' } }
   },
 
   compatibilityDate: '2026-06-30',

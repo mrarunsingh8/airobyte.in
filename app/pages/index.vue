@@ -89,9 +89,9 @@ const revisionTabs = computed(() => courses.value
   .filter(course => interviewQuestions[course.slug]?.length)
   .map(course => ({ label: course.title, icon: course.icon, value: course.slug, questions: interviewQuestions[course.slug]! })))
 
-useSeoMeta({
-  title: 'Learn to code, step by step',
-  description: 'Beginner-friendly programming courses. Go from zero to hero with short lessons, real-life examples and code you can run in your browser, and come back to brush up before every interview.'
+usePageSeo('/', {
+  title: 'Learn to Code with Beginner-Friendly Lessons',
+  description: 'Learn JavaScript from scratch with beginner-friendly lessons, practical examples you can run in your browser, and a clear learning path.'
 })
 </script>
 
